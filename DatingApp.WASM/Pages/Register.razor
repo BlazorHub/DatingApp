@@ -1,0 +1,170 @@
+﻿@inject IJSRuntime js
+@inject AuthService authService
+@inject NavigationManager NavManager
+
+<EditForm EditContext="editContext"
+          OnSubmit="RegisterUser">
+    <h2 class="text-center text-primary">Sign Up</h2>
+    <hr />
+
+    <div class="form-group">
+        <label class="control-label" style="margin-right:15px">I am a: </label>
+        @foreach (var item in new string[] { "Male", "Female" })
+        {
+            <label class="radio-inline mr-3">
+                <input type="radio"
+                       name="gender"
+                       id="@item"
+                       value="@item"
+                       checked=@(registerForm.Gender.Equals(item,StringComparison.OrdinalIgnoreCase))
+                       @onchange="GenderSelection" />
+                <label for="@item">@item</label>
+            </label>
+        }
+    </div>
+
+    <div class="form-group">
+        <InputTextWithValidation Type="text"
+                                 Class="form-control"
+                                 PropertyName="Username"
+                                 Placeholder="Username"
+                                 EditContext="editContext"
+                                 Model="registerForm"
+                                 ShowErrors="showErrors"
+                                 @bind-BindingValue="registerForm.Username" />
+    </div>
+
+    <div class="form-group">
+        <InputTextWithValidation Type="password"
+                                 Class="form-control"
+                                 PropertyName="Password"
+                                 Placeholder="Password"
+                                 EditContext="editContext"
+                                 Model="registerForm"
+                                 ShowErrors="showErrors"
+                                 @bind-BindingValue="registerForm.Password" />
+    </div>
+
+    <div class="form-group">
+        <InputTextWithValidation Type="password"
+                                 Class="form-control"
+                                 PropertyName="ConfirmPassword"
+                                 Placeholder="Confirm Password"
+                                 EditContext="editContext"
+                                 Model="registerForm"
+                                 ShowErrors="showErrors"
+                                 @bind-BindingValue="registerForm.ConfirmPassword" />
+    </div>
+
+    <div class="form-group">
+        <InputTextWithValidation Type="text"
+                                 Class="form-control"
+                                 PropertyName="KnownAs"
+                                 Placeholder="Known As"
+                                 EditContext="editContext"
+                                 Model="registerForm"
+                                 ShowErrors="showErrors"
+                                 @bind-BindingValue="registerForm.KnownAs" />
+    </div>
+
+    <div class="form-group">
+        <InputDateWithValidation Class="form-control"
+                                 PropertyName="DateOfBirth"
+                                 Placeholder="Date of Birth"
+                                 EditContext="editContext"
+                                 Model="registerForm"
+                                 ShowErrors="showErrors"
+                                 @bind-BindingValue="registerForm.DateOfBirth" />
+    </div>
+
+    <div class="form-group">
+        <InputTextWithValidation Type="text"
+                                 Class="form-control"
+                                 PropertyName="City"
+                                 Placeholder="City"
+                                 EditContext="editContext"
+                                 Model="registerForm"
+                                 ShowErrors="showErrors"
+                                 @bind-BindingValue="registerForm.City" />
+    </div>
+
+    <div class="form-group">
+        <InputTextWithValidation Type="text"
+                                 Class="form-control"
+                                 PropertyName="Country"
+                                 Placeholder="Country"
+                                 EditContext="editContext"
+                                 Model="registerForm"
+                                 ShowErrors="showErrors"
+                                 @bind-BindingValue="registerForm.Country" />
+    </div>
+
+    <div class="form-group text-center">
+        <button class="btn btn-success"
+                disabled="@(editContext.Validate() == false)"
+                type="submit">
+            Register
+        </button>
+        <button class="btn btn-default"
+                type="button"
+                @onclick="@(() => ShowRegisterForm.InvokeAsync(false))">
+            Cancel
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public EventCallback<bool> ShowRegisterForm { get; set; }
+
+    EditContext editContext;
+    RegisterForm registerForm = new RegisterForm();
+    bool showErrors;
+
+    void GenderSelection(ChangeEventArgs args)
+    {
+        registerForm.Gender = args.Value.ToString();
+    }
+
+    protected override void OnInitialized()
+    {
+        editContext = new EditContext(registerForm);
+        editContext.AddDataAnnotationsValidation();
+    }
+
+    async Task RegisterUser()
+    {
+        if (editContext.Validate() == false)
+            showErrors = true;
+        else
+        {
+            var response = await authService.Register(registerForm);
+
+            if (!string.IsNullOrWhiteSpace(response))
+            {
+                await js.InvokeVoidAsync("alertify.error", response);
+            }
+            else
+            {
+                var loginResponse = await authService.Login(new LoginForm
+                {
+                    Username = registerForm.Username,
+                    Password = registerForm.Password
+                });
+
+                if (loginResponse.StartsWith("OK"))
+                {
+                    var token = loginResponse.Split(" ")[1];
+                    await js.InvokeVoidAsync("alertify.success", "You are now registered!");
+                    await js.InvokeVoidAsync("saveToken", token);
+
+                    NavManager.NavigateTo("/members");
+                }
+                else
+                {
+                    await js.InvokeVoidAsync("alertify.error", response);
+                }
+            }
+        }
+    }
+}

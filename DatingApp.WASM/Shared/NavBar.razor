@@ -1,0 +1,134 @@
+﻿@inherits FluxorComponent
+
+@inject NavigationManager navigationManager
+@inject AuthService authService
+@inject IState<UserState> userState
+@inject IDispatcher dispatcher
+@inject IJSRuntime jsRuntime
+
+<nav class="navbar navbar-expand-lg navbar-light bg-primary">
+    <div class="container">
+        <NavLink class="navbar-brand"
+                 href=""
+                 Match="NavLinkMatch.All">Dating App</NavLink>
+        <button class="navbar-toggler"
+                type="button"
+                data-toggle="collapse"
+                data-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+
+            <ul class="navbar-nav mr-auto">
+                @if (userState.Value.CurrentUser != null)
+                {
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="members">Matches</NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="lists">Lists</NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="messages">Messages</NavLink>
+                    </li>
+                }
+            </ul>
+            <form class="form-inline my-2 my-lg-0">
+                @if (userState.Value.CurrentUser != null)
+                {
+                    <div class="dropdown d-flex justify-content-between">
+                        <img id="photo-url"
+                             src="@(userState.Value.CurrentUser.PhotoUrl ?? "assets/user.jpg")"
+                             alt="@userState.Value.CurrentUser.KnownAs's photo" />
+                        <a class="nav-link dropdown-toggle"
+                           id="navbarDropdown"
+                           role="button"
+                           data-toggle="dropdown"
+                           aria-haspopup="true"
+                           aria-expanded="false">
+                            Welcome @userState.Value.CurrentUser.KnownAs
+                        </a>
+                        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <NavLink class="dropdown-item" href="members/edit">Edit Profile</NavLink>
+                            <a class="dropdown-item" href="#">Another action</a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item"
+                               @onclick="Logout">
+                                Logout
+                            </a>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <EditForm Model="@loginForm"
+                              class="form-inline my-2 my-lg-0"
+                              OnSubmit="@Login">
+                        <InputText required
+                                   class="form-control mr-sm-2"
+                                   type="text"
+                                   placeholder="Username"
+                                   @bind-Value="loginForm.Username" />
+                        <InputText required
+                                   class="form-control mr-sm-2"
+                                   type="password"
+                                   placeholder="Password"
+                                   @bind-Value="loginForm.Password" />
+                        <button class="btn btn-success my-2 my-sm-0"
+                                type="submit">
+                            Login
+                        </button>
+                    </EditForm>
+                }
+            </form>
+        </div>
+    </div>
+</nav>
+
+<style>
+    #photo-url {
+        max-height: 50px;
+        border: 2px solid white;
+    }
+</style>
+
+@code {
+    LoginForm loginForm = new LoginForm();
+
+    bool isFormValid()
+    {
+        return !(string.IsNullOrWhiteSpace(loginForm.Username)) &&
+        !(string.IsNullOrWhiteSpace(loginForm.Password));
+    }
+
+    async Task Login()
+    {
+        var response = await authService.Login(loginForm);
+
+        if (response.StartsWith("OK"))
+        {
+            var token = response.Split(" ")[1];
+            await jsRuntime.InvokeVoidAsync("alertify.success", "Logged In Successfully!");
+            await jsRuntime.InvokeVoidAsync("saveToken", token);
+
+            navigationManager.NavigateTo("/members");
+        }
+        else
+        {
+            await jsRuntime.InvokeVoidAsync("alertify.error", response);
+        }
+    }
+
+    async Task Logout()
+    {
+        await jsRuntime.InvokeVoidAsync("removeToken");
+        await jsRuntime.InvokeVoidAsync("removeUser");
+
+        dispatcher.Dispatch(new SetCurrentUserAction { User = null });
+        navigationManager.NavigateTo("/");
+    }
+}
